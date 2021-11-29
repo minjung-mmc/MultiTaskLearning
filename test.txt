@@ -1,0 +1,2 @@
+img__size [1024, 2048]
+epoch : 0, index: 0,  Loss : nan, Loss_seg : 3.5706, Loss_depth : nan, Loss_cls : 83.0104, Loss_box : 0.0272
