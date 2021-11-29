@@ -19,7 +19,7 @@ class BaseLoader(data.Dataset):
             seg_label = params.train_seg_label
             depth_label = params.train_depth_label
             with open(
-                "../dataset/CityScape/customized/cityscapes_panoptic_train.json"
+                params.train_ann
             ) as json_file:
                 self.ann = json.load(json_file)["annotations"]
         elif mode == "val":
@@ -27,7 +27,7 @@ class BaseLoader(data.Dataset):
             seg_label = params.val_seg_label
             depth_label = params.val_depth_label
             with open(
-                "../dataset/CityScape/customized/cityscapes_panoptic_val.json"
+                params.val_ann
             ) as json_file:
                 self.ann = json.load(json_file)["annotations"]
         elif mode == "test":

@@ -11,6 +11,10 @@ class params:
         self.val_img_path = "../dataset/CityScape/leftImg8bit/val/"
         self.val_seg_label = "../dataset/CityScape/gtFine/val/"
         self.val_depth_label = "../dataset/CityScape/disparity/val/"
+        self.val_ann = "../dataset/CityScape/customized/cityscapes_panoptic_val.json"
+        self.train_ann = (
+            "../dataset/CityScape/customized/cityscapes_panoptic_train.json"
+        )
         self.batch_size = 1
         self.mode = "Train"
         self.num_epoch = 100
