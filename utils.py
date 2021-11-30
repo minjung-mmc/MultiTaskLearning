@@ -60,6 +60,13 @@ def visualize(path, save_path, bbox, target, epoch=0, idx=0):
             ax[-2].text(x1, y1, "{}".format(text), color=color(n))
     box_tar = target["bbox"][0]
     cls = target["cls"][0]
+
+    ############################# Filter -1 ###############################
+    valid_idx = cls > -1  # filter gt targets w/ label <= -1
+    cls = cls[valid_idx]
+    box_tar = box_tar[valid_idx]
+    ############################# Filter -1 ###############################
+
     # print(box_tar.shape)
     for i in range(len(box_tar)):
         n = random.randrange(1, 30)

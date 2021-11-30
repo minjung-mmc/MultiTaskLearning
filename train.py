@@ -120,8 +120,8 @@ class trainer:
                 seg = output.get("seg")
                 depth = output.get("depth")
                 target = output.get("od")
-                if target["bbox"].shape[1] == 0:
-                    continue
+                # if target["bbox"].shape[1] == 0:
+                #     continue
 
                 model.train()  # 혹시 모르니까
                 model.zero_grad()
@@ -179,23 +179,21 @@ class trainer:
                 #     optimizer_depth.step()
 
                 if idx % 100 == 0 or idx == (len(data_loader_train) - 1):
-
+                    bs = img.size(0)
                     # print("model output", box_out[])
                     # out_depth *= 126
                     img *= 255
                     # depth *= 126
                     out_seg = torch.argmax(out_seg, dim=1)  # size = (1024, 2048)
-                    out_seg = utils.decode_segmap(out_seg.squeeze(0))
-                    seg = utils.decode_segmap(seg.squeeze(0))
+                    out_seg = utils.decode_segmap(out_seg[0])
+                    seg = utils.decode_segmap(seg[0])
                     out_seg = ToPILImage()(out_seg.detach())
                     seg = ToPILImage()(seg.detach())  # size = (1024, 2048, 3)
-                    out_depth = ToPILImage()(out_depth.squeeze(0).detach())
+                    out_depth = ToPILImage()(out_depth[0].detach())
                     img = F.interpolate(img, size=(128, 256))
-                    img = (
-                        img.permute(0, 2, 3, 1).contiguous().int().squeeze(0).to("cpu")
-                    )
+                    img = img[0].permute(1, 2, 0).contiguous().int().to("cpu")
                     img = img.numpy()[:, :, ::-1].copy()
-                    depth = ToPILImage()(depth.squeeze(0).detach())
+                    depth = ToPILImage()(depth[0].detach())
                     #########################################################################################
                     class_out, box_out, indices, classes = utils.post_process(
                         class_out,
@@ -206,11 +204,17 @@ class trainer:
                     )
 
                     img_scale, img_size = (
-                        [torch.tensor(1).to(params.device)],
-                        [torch.tensor([256, 128]).to(params.device)],
+                        [
+                            torch.tensor(1).to(params.device),
+                            torch.tensor(1).to(params.device),
+                        ],
+                        [
+                            torch.tensor([256, 128]).to(params.device),
+                            torch.tensor([256, 128]).to(params.device),
+                        ],
                     )
                     res = utils.batch_detection(
-                        1,
+                        bs,
                         class_out,
                         box_out,
                         anchors.boxes,
@@ -221,8 +225,7 @@ class trainer:
                         max_det_per_image=config["max_det_per_image"],
                         soft_nms=config["soft_nms"],
                     )
-
-                    bboxes = utils.decode_det(res)
+                    bboxes = utils.decode_det(res[0].unsqueeze(0))
                     # print("resshape", res.shape)
                     #########################################################################################
 
@@ -245,59 +248,59 @@ class trainer:
                     )
 
                     writer.add_scalar(
-                        "Loss/train", Loss, epoch * len(data_loader_train) + idx
+                        "Loss/train",
+                        Loss,
+                        epoch * len(data_loader_train) + idx * params.batch_size,
                     )
                     writer.add_scalar(
                         "Loss/train/depth",
                         Loss_depth,
-                        epoch * len(data_loader_train) + idx,
+                        epoch * len(data_loader_train) + idx * params.batch_size,
                     )
                     writer.add_scalar(
-                        "Loss/train/seg", Loss_seg, epoch * len(data_loader_train) + idx
+                        "Loss/train/seg",
+                        Loss_seg,
+                        epoch * len(data_loader_train) + idx * params.batch_size,
                     )
                     writer.add_scalar(
                         "Loss/train/cls",
                         class_loss,
-                        epoch * len(data_loader_train) + idx,
+                        epoch * len(data_loader_train) + idx * params.batch_size,
                     )
                     writer.add_scalar(
-                        "Loss/train/box", box_loss, epoch * len(data_loader_train) + idx
+                        "Loss/train/box",
+                        box_loss,
+                        epoch * len(data_loader_train) + idx * params.batch_size,
                     )
 
-                    ################################ Validate ######################################
-                    with torch.set_grad_enabled(False):
-                        model.eval()
-                        val_loss = 0
-                        for i, output in enumerate(data_loader_val):
-                            img = output.get("img")
-                            seg = output.get("seg")
-                            depth = output.get("depth")
-                            target = output.get("od")
-                            if target["bbox"].shape[1] == 0:
-                                continue
-                            out_seg, out_depth, class_out, box_out = model(img)
+            ################################ Validate ######################################
+            with torch.set_grad_enabled(False):
+                model.eval()
+                val_loss = 0
+                for i, output in enumerate(data_loader_val):
+                    img = output.get("img")
+                    seg = output.get("seg")
+                    depth = output.get("depth")
+                    target = output.get("od")
+                    # if target["bbox"].shape[1] == 0:
+                    #     continue
+                    out_seg, out_depth, class_out, box_out = model(img)
 
-                            cls_targets, box_targets, num_positives = anchor_labeler.batch_label_anchors(
-                                target["bbox"], target["cls"]
-                            )
-                            loss, class_loss, box_loss = loss_fn(
-                                class_out,
-                                box_out,
-                                cls_targets,
-                                box_targets,
-                                num_positives,
-                            )
-                            Loss_seg = criterion(out_seg, seg.long())
-                            Loss_depth = criterion1(out_depth, depth)
-                            Loss = Loss_seg + 10 * Loss_depth + 0.005 * loss
-                            val_loss += Loss
-                        val_loss = val_loss / len(data_loader_val)
+                    cls_targets, box_targets, num_positives = anchor_labeler.batch_label_anchors(
+                        target["bbox"], target["cls"]
+                    )
+                    loss, class_loss, box_loss = loss_fn(
+                        class_out, box_out, cls_targets, box_targets, num_positives
+                    )
+                    Loss_seg = criterion(out_seg, seg.long())
+                    Loss_depth = criterion1(out_depth, depth)
+                    Loss = Loss_seg + 10 * Loss_depth + 0.005 * loss
+                    val_loss += Loss
+                val_loss = val_loss / len(data_loader_val)
 
-                        writer.add_scalar(
-                            "Loss/val", val_loss, epoch * len(data_loader_train) + idx
-                        )
+                writer.add_scalar("Loss/val", val_loss, epoch)
 
-                    ################################ Validate ######################################
+            ################################ Validate ######################################
 
             # writer.add_scalar("Loss/")
             scheduler.step()
@@ -308,7 +311,7 @@ class trainer:
     def init_model(self):
         config = get_efficientdet_config("efficientdet_d0")
         model = EfficientDet(
-            config,  
+            config,
             params.num_classes_seg,
             params.num_classes_depth,
             pretrained_backbone=False,

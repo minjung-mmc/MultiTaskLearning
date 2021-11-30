@@ -3,7 +3,7 @@ import torch
 
 class params:
     def __init__(self):
-        self.device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # self.device = "cpu"
         self.train_img_path = "../dataset/CityScape/leftImg8bit/train/"
         self.train_seg_label = "../dataset/CityScape/gtFine/train/"
@@ -15,7 +15,7 @@ class params:
         self.train_ann = (
             "../dataset/CityScape/customized/cityscapes_panoptic_train.json"
         )
-        self.batch_size = 1
+        self.batch_size = 2
         self.mode = "Train"
         self.num_epoch = 100
         self.gamma = 0.1

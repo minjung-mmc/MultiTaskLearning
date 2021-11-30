@@ -14,7 +14,7 @@ from collections import OrderedDict
 from typing import List, Callable, Optional, Union, Tuple
 from functools import partial
 import numpy as np
-# from config import params
+from config import params
 
 # from efficientDet.backbone.efficientnet_builder import efficientnet
 
@@ -869,10 +869,10 @@ class attention(nn.Module):
         self.head_num = head_num
         self.activation = activation
 
-        self.linear_q = nn.Linear(in_feature, in_feature, device = "cuda:0")
-        self.linear_k = nn.Linear(in_feature, in_feature, device = "cuda:0")
-        self.linear_v = nn.Linear(in_feature, in_feature, device = "cuda:0")
-        self.linear_o = nn.Linear(in_feature, in_feature, device = "cuda:0")
+        self.linear_q = nn.Linear(in_feature, in_feature, device = params.device)
+        self.linear_k = nn.Linear(in_feature, in_feature, device = params.device)
+        self.linear_v = nn.Linear(in_feature, in_feature, device = params.device)
+        self.linear_o = nn.Linear(in_feature, in_feature, device = params.device)
     
     def forward(self, q, k, v, mask=None):
         

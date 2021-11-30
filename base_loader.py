@@ -1,4 +1,5 @@
 import os
+from re import M
 import numpy as np
 
 from torch.utils import data
@@ -18,17 +19,13 @@ class BaseLoader(data.Dataset):
             img_path = params.train_img_path
             seg_label = params.train_seg_label
             depth_label = params.train_depth_label
-            with open(
-                params.train_ann
-            ) as json_file:
+            with open(params.train_ann) as json_file:
                 self.ann = json.load(json_file)["annotations"]
         elif mode == "val":
             img_path = params.val_img_path
             seg_label = params.val_seg_label
             depth_label = params.val_depth_label
-            with open(
-                params.val_ann
-            ) as json_file:
+            with open(params.val_ann) as json_file:
                 self.ann = json.load(json_file)["annotations"]
         elif mode == "test":
             img_path = params.test_img_path
@@ -64,13 +61,20 @@ class BaseLoader(data.Dataset):
         # print("depth : ", torch.max(depth), torch.min(depth)) # 0~126
         bbox = []
         cls = []
-        for segment in self.ann[index]["segments_info"]:
-            [x1, y1, w, h] = segment["bbox"]
-            bbox.append([y1, x1, (y1 + h), (x1 + w)])
-            cls.append(segment["category_id"] + 1)
+        
+        if len(self.ann[index]["segments_info"]) == 0:
+            bbox = [[-1, -1, -1, -1]]
+            cls = [-1]
+        else:
+            for segment in self.ann[index]["segments_info"]:
+                if len(segment) != 0:
+                    [x1, y1, w, h] = segment["bbox"]
+                    bbox.append([y1, x1, (y1 + h), (x1 + w)])
+                    cls.append(segment["category_id"] + 1)
+    
 
         od = {
-            "img_idx": index,
+            # "img_idx": index,
             # "img_size": (256, 128),
             "bbox": torch.FloatTensor(bbox).to(params.device),
             "cls": torch.FloatTensor(cls).to(params.device),
@@ -114,11 +118,34 @@ class BaseLoader(data.Dataset):
         return obj
 
 
+    def collate_fn(self, samples):
+        imgs = [sample["img"] for sample in samples]
+        segs = [sample["seg"] for sample in samples]
+        depths = [sample["depth"] for sample in samples]
+        bboxes = [sample["od"]["bbox"] for sample in samples]
+        clss = [sample["od"]["cls"] for sample in samples]
+            
+        padded_bbox = torch.nn.utils.rnn.pad_sequence(
+            bboxes, batch_first=True, padding_value=-1
+        )
+        padded_cls = torch.nn.utils.rnn.pad_sequence(
+            clss, batch_first=True, padding_value=-1
+        )
+        return {
+            "img": torch.stack(imgs).contiguous(),
+            "seg": torch.stack(segs).contiguous(),
+            "depth": torch.stack(depths).contiguous(),
+            "od": {"bbox": padded_bbox.contiguous(), "cls": padded_cls.contiguous()},
+        }
+
+
 if __name__ == "__main__":
 
     train_dataset = BaseLoader("train")
     val_dataset = BaseLoader("val")
-    train_loader = data.DataLoader(train_dataset, batch_size=params.batch_size)
+    train_loader = data.DataLoader(
+        train_dataset, batch_size=params.batch_size, collate_fn=collate_fn
+    )
 
     save_path = "./show_img"
     if os.path.exists(save_path):
@@ -136,8 +163,7 @@ if __name__ == "__main__":
         depth = output.get("depth")
         path = [img, seg, depth]
         od = output.get("od")
-        print(od["bbox"].type())
-        print(od)
+        print(img.size(), od["bbox"].size(), od["cls"])
         break
         visualize(path, save_path)
 
